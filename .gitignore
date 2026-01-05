@@ -1,0 +1,19 @@
+# datasets / outputs
+data/
+results/
+*.zip
+*.jsonl
+*.json
+/tmp/
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+.env
+
+# misc
+.DS_Store
