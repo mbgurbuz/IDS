@@ -117,16 +117,6 @@ python validate_sql_fixed.py
 2. **Bruteforce**: Rule `shutdown < stat` captures login retry pattern
 3. **SQL-Injection**: Lower coverage but high precision when violations detected
 
-## Citation
-```bibtex
-@inproceedings{janicki2025hybrid,
-  title={Hybrid Syscall Modeling for Explainable Container Runtime Security},
-  author={Janicki, Ryszard and Gurbuz, Muhammet Bekir},
-  booktitle={Lecture Notes in Computer Science},
-  year={2026},
-  publisher={Springer}
-}
-```
 
 ## References
 
