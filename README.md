@@ -1,164 +1,138 @@
-# Explainable Anomaly Detection for Container Security
-## LID-DS Dataset Implementation
+# Hybrid Syscall Modeling for Explainable Container Runtime Security
 
-Bu proje, "Explainable Anomaly Detection in Container Security" makalesindeki 
-metodolojiyi LID-DS veri setine uygular.
+This repository contains the implementation for the paper "Hybrid Syscall Modeling for Explainable Container Runtime Security" (LNCS 2025).
 
----
+## Overview
 
-## 📁 Proje Yapısı
+We present a hybrid approach that separates **detection** from **explanation**:
+- **STIDE**: Lightweight n-gram model for anomaly detection
+- **R◇ Partial Order**: Provides human-readable explanations via syscall precedence violations
 
+## Results Summary
+
+| Scenario | STIDE F1 | R◇ PO F1 | HC@TP | ExplPrec | Top Rule |
+|----------|----------|----------|-------|----------|----------|
+| CVE-2017-12635 (CouchDB) | 0.992 | 0.972±0.002 | 99.1% | 100% | munmap < mprotect |
+| Bruteforce_CWE-307 | 0.972 | 0.902±0.184 | 88.0% | 100% | shutdown < stat |
+| CWE-89-SQL-injection | 0.835 | 0.603±0.148 | 56.8% | 93% | pwrite < write |
+
+## Project Structure
 ```
 explainable_ids/
-├── README.md                    # Bu dosya
-├── requirements.txt             # Python bağımlılıkları
-├── config.py                    # Konfigürasyon parametreleri
-│
-├── data/                        # Veri klasörü
-│   └── LID-DS-2021/            # LID-DS veri seti (sen indireceksin)
-│       └── CVE-2017-7529/      # Örnek senaryo
-│           ├── training/
-│           └── test/
-│
-├── src/                         # Kaynak kodlar
-│   ├── __init__.py
-│   ├── data_loader.py          # LID-DS veri okuyucu
-│   ├── precedence_extractor.py # Pairwise precedence çıkarıcı
-│   ├── partial_order.py        # Poset modeli
-│   ├── detector.py             # Anomali dedektörü
-│   └── explainer.py            # Açıklama üretici
-│
-├── experiments/                 # Deneyler
-│   ├── run_experiment.py       # Ana deney scripti
-│   └── evaluate.py             # Değerlendirme metrikleri
-│
-└── results/                     # Sonuçlar
-    ├── model.json              # Eğitilmiş model
-    ├── detections.json         # Tespit edilen anomaliler
-    └── report.txt              # Değerlendirme raporu
+├── README.md
+├── requirements.txt
+├── config.py                      # Hyperparameters
+├── final_validation_multiseed.py  # Main evaluation (5-seed)
+├── rdiamond_couchdb.py            # CouchDB detailed analysis
+├── rdiamond_others.py             # Bruteforce + SQL analysis
+├── validate_bruteforce.py         # Bruteforce rule validation
+├── validate_sql_fixed.py          # SQL rule validation
+├── check_bruteforce.py            # Bruteforce sanity check
+├── simple_stide.py                # STIDE baseline
+└── data/
+    └── LID-DS-2021/               # Dataset (download separately)
 ```
 
----
-
-## 🚀 Kurulum Adımları
-
-### Adım 1: LID-DS Veri Setini İndir
-
+## Installation
 ```bash
-# LID-DS 2021'i indir (Proton Drive):
-# https://drive.proton.me/urls/BWKRGQK994#fCK9JKL93Sjm
-
-# İndirdikten sonra data/ klasörüne çıkar:
-mkdir -p data/LID-DS-2021
-unzip LID-DS-2021.zip -d data/LID-DS-2021/
-```
-
-### Adım 2: Python Ortamını Kur
-
-```bash
-# Virtual environment oluştur
+# Create virtual environment
 python3 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+source venv/bin/activate
 
-# Bağımlılıkları kur
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-### Adım 3: Deneyi Çalıştır
+## Dataset
 
+Download LID-DS 2021 from: https://github.com/LID-DS/LID-DS
+
+Extract to `data/LID-DS-2021/`:
+```
+data/LID-DS-2021/
+├── CVE-2017-12635_6/
+├── Bruteforce_CWE-307/
+└── CWE-89-SQL-injection/
+```
+
+## Usage
+
+### Run Full Evaluation (5 seeds)
 ```bash
-# Tek bir senaryo için
-python experiments/run_experiment.py --scenario CVE-2017-7529
-
-# Tüm senaryolar için
-python experiments/run_experiment.py --all
+python final_validation_multiseed.py
 ```
 
----
+### Run Individual Scenario Analysis
+```bash
+# CouchDB (Privilege Escalation)
+python rdiamond_couchdb.py
 
-## 📊 Metodoloji (Makaleden)
-
-### 1️⃣ Windowing & Pairwise Precedence Extraction
-- Syscall dizisini W boyutunda pencerelere böl
-- Her pencerede, Δ hop içindeki çiftleri (a→b) say
-- Minimum destek (τ) ve yön eşiği (θ) uygula
-
-### 2️⃣ Partial Order (Poset) Modeli Oluşturma  
-- Sadece normal veriden öğren
-- Döngüleri R◇ algoritması ile kır
-- Transitive reduction ile Hasse diyagramı oluştur
-
-### 3️⃣ Anomali Tespiti
-- Test verisinde model ihlallerini ara
-- ORDER_INVERSION: Model A→B derken B→A gözlemlenirse
-- TRANSITIVITY_BREAK: A<B<C varken C→A gözlemlenirse
-
-### 4️⃣ Explainability
-- Her ihlal için anlaşılır açıklama üret
-- Örnek: "Violation: 'read' should precede 'close', but observed 'close' → 'read'"
-
----
-
-## 🔧 Konfigürasyon Parametreleri
-
-| Parametre | Varsayılan | Açıklama |
-|-----------|------------|----------|
-| W | 100 | Pencere boyutu (syscall sayısı) |
-| overlap | 0.5 | Pencere örtüşme oranı |
-| delta_hops | 50 | Maksimum hop mesafesi |
-| min_support | 30 | Minimum destek eşiği |
-| theta | 0.7 | Yön belirleme eşiği |
-| anomaly_threshold | 0.3 | Anomali skoru eşiği |
-
----
-
-## 📈 Beklenen Çıktılar
-
-### 1. Model Özeti
-```
-PARTIAL ORDER MODEL SUMMARY
-============================
-Total syscalls: 45
-Total edges (DAG): 120
-Hasse edges (reduced): 78
-Repair method: rdiamond
-
-Top precedence rules:
-  openat → read (w=0.92)
-  socket → bind (w=0.89)
-  ...
+# Bruteforce + SQL-Injection
+python rdiamond_others.py
 ```
 
-### 2. Detection Sonuçları
-```
-DETECTION RESULTS
-=================
-Trace: attack_001
-Status: 🔴 ANOMALY (score: 0.78)
-Violations:
-  ⚠️ ORDER INVERSION: Model 'bind' → 'listen' bekliyor, 
-     ancak 'listen' → 'bind' gözlemlendi (güven: 95%)
+### Validate Specific Rules
+```bash
+python validate_bruteforce.py
+python validate_sql_fixed.py
 ```
 
-### 3. Değerlendirme Metrikleri
+## Methodology
+
+### 1. STIDE Detection
+- Extract 5-gram syscall sequences from training data
+- Flag test traces with unseen n-grams above threshold
+
+### 2. R◇ Partial Order Construction
+- Count pairwise syscall precedences within δ-hop window
+- Build relation R with high-confidence edges (θ ≥ 0.75)
+- Apply R◇ algorithm to obtain consistent partial order:
+  1. Break cycles by removing random edges
+  2. Re-add edges while maintaining acyclicity
+  3. Compute transitive closure
+
+### 3. Violation Detection
+- For each test trace, identify precedence violations
+- High-confidence (HC) violation: observed order contradicts model edge with confidence ≥ 0.80
+
+### 4. Explainability Metrics
+- **HC@TP**: % of true positive alerts with ≥1 HC violation
+- **HC@FP**: % of false positive alerts with ≥1 HC violation  
+- **ExplPrec**: Precision of HC violations as attack indicators
+
+## Hyperparameters
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| n (STIDE) | 5 | N-gram length |
+| δ (delta) | 15 | Maximum hop distance |
+| τ (min_support) | 30 | Minimum pair occurrences |
+| θ_edge | 0.75 | Edge confidence threshold |
+| θ_obs | 0.60 | Observed ratio threshold |
+| θ_model | 0.80 | Model confidence threshold |
+
+## Key Findings
+
+1. **CVE-2017-12635**: Rule `munmap < mprotect` detects memory protection bypass with 100% precision
+2. **Bruteforce**: Rule `shutdown < stat` captures login retry pattern
+3. **SQL-Injection**: Lower coverage but high precision when violations detected
+
+## Citation
+```bibtex
+@inproceedings{janicki2025hybrid,
+  title={Hybrid Syscall Modeling for Explainable Container Runtime Security},
+  author={Janicki, Ryszard and Gurbuz, Muhammet Bekir},
+  booktitle={Lecture Notes in Computer Science},
+  year={2025},
+  publisher={Springer}
+}
 ```
-EVALUATION REPORT
-=================
-True Positives:  45
-False Positives: 3
-True Negatives:  150
-False Negatives: 2
 
-Precision: 0.9375
-Recall:    0.9574
-F1 Score:  0.9474
-Accuracy:  0.9750
-```
+## References
 
----
+- Janicki, R., Liu, T. "On Approximations of Arbitrary Relations by Partial Orders"
+- LID-DS 2021 Dataset: Grimmer et al., CRITIS 2022
 
-## 📚 Referanslar
+## Acknowledgments
 
-1. Gurbuz, M.B. "Explainable Anomaly Detection in Container Security"
-2. Grimmer et al. "Dataset Report: LID-DS 2021" CRITIS 2022
-3. Janicki & Liu "On approximations of arbitrary relations by partial orders"
+AI assistance (Claude, Anthropic) was used for implementation and analysis.
