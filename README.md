@@ -123,7 +123,7 @@ python validate_sql_fixed.py
   title={Hybrid Syscall Modeling for Explainable Container Runtime Security},
   author={Janicki, Ryszard and Gurbuz, Muhammet Bekir},
   booktitle={Lecture Notes in Computer Science},
-  year={2025},
+  year={2026},
   publisher={Springer}
 }
 ```
